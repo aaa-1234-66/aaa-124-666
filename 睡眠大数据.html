@@ -1,0 +1,340 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>昨夜安否 · 中国青年睡眠大数据观察</title>
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap">
+<script src="https://fastly.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  :root{
+    --deep:#070d1f; --deep2:#0d1730; --card:rgba(255,255,255,.06);
+    --line:rgba(150,180,230,.18); --txt:#e8f0ff; --sub:#a9bde6;
+    --blue:#7db8ff; --cyan:#8fe0e8; --violet:#b3a6ff; --warm:#ffd9a8;
+  }
+  html,body{height:100%}
+  body{
+    font-family:'Noto Sans SC',system-ui,-apple-system,sans-serif;
+    background:radial-gradient(1200px 800px at 70% -10%,#1a2a52 0%,#0d1730 45%,#070d1f 100%);
+    color:var(--txt); overflow-x:hidden;
+  }
+  /* 星空画布 */
+  #starfield{position:fixed;inset:0;z-index:0;pointer-events:none}
+  /* 滚动容器 */
+  .deck{position:relative;z-index:1;scroll-snap-type:y mandatory;overflow-y:auto;height:100vh}
+  section{
+    min-height:100vh;scroll-snap-align:start;position:relative;
+    display:flex;flex-direction:column;justify-content:center;
+    padding:64px 26px 72px; max-width:520px;margin:0 auto;width:100%;
+  }
+  /* 入场动画 */
+  .rv{opacity:0;transform:translateY(34px);transition:opacity .9s ease,transform .9s ease}
+  .rv.on{opacity:1;transform:translateY(0)}
+  .rv.d1{transition-delay:.12s}.rv.d2{transition-delay:.24s}.rv.d3{transition-delay:.36s}
+  /* 通用排版 */
+  .kicker{font-size:13px;letter-spacing:.28em;color:var(--sub);margin-bottom:18px;text-transform:uppercase}
+  h1{font-size:34px;line-height:1.4;font-weight:900;letter-spacing:.02em}
+  h2{font-size:24px;line-height:1.45;font-weight:700;margin-bottom:14px}
+  .lead{font-size:15px;line-height:1.9;color:var(--sub);font-weight:300}
+  .accent{background:linear-gradient(90deg,var(--blue),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px;backdrop-filter:blur(8px)}
+  .src{font-size:11px;color:#7e93bd;margin-top:14px;line-height:1.7}
+  .pageno{position:absolute;top:26px;right:26px;font-size:12px;color:#6f86b5;letter-spacing:.2em}
+  .pageno b{color:var(--blue)}
+  .scroll-hint{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);font-size:12px;color:#7e93bd;letter-spacing:.25em;animation:bob 2.2s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,8px)}}
+  /* 大数字 */
+  .big-num{font-size:58px;font-weight:900;line-height:1;background:linear-gradient(120deg,#cfe6ff,var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .big-num small{font-size:20px;font-weight:500}
+  /* 图表 */
+  .chart-box{position:relative;height:230px;margin-top:10px}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--sub);margin-top:10px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+  /* 数据条 */
+  .bar-row{margin:16px 0}
+  .bar-row .top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;color:var(--sub)}
+  .bar-track{height:10px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden}
+  .bar-fill{height:100%;border-radius:6px;width:0;background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width 1.4s cubic-bezier(.22,.8,.3,1)}
+  /* 自测 */
+  .quiz-q{font-size:16px;font-weight:500;margin:22px 0 12px}
+  .quiz-op{display:block;width:100%;text-align:left;padding:13px 16px;margin:8px 0;border-radius:14px;
+    background:var(--card);border:1px solid var(--line);color:var(--txt);font-size:14px;cursor:pointer;transition:.25s}
+  .quiz-op.sel{border-color:var(--blue);background:rgba(125,184,255,.18)}
+  .quiz-op .tag{color:var(--blue);margin-right:10px;font-weight:700}
+  #quizResult{margin-top:22px}
+  /* 代价卡片 */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .sym{padding:18px 16px;border-radius:18px;background:var(--card);border:1px solid var(--line)}
+  .sym .ico{font-size:26px;margin-bottom:10px}
+  .sym h3{font-size:15px;margin-bottom:6px}
+  .sym p{font-size:12.5px;color:var(--sub);line-height:1.7}
+  /* 建议 */
+  .tip{display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--line)}
+  .tip:last-child{border-bottom:none}
+  .tip .n{flex:none;width:34px;height:34px;border-radius:12px;background:rgba(125,184,255,.15);color:var(--blue);
+    display:flex;align-items:center;justify-content:center;font-weight:700}
+  .tip h3{font-size:15px;margin-bottom:4px}
+  .tip p{font-size:13px;color:var(--sub);line-height:1.7}
+  /* 结尾 */
+  .end{text-align:center}
+  .end h1{font-size:30px}
+  .moon{font-size:56px;margin-bottom:24px;filter:drop-shadow(0 0 24px rgba(180,210,255,.5))}
+  .src-block{margin-top:30px;text-align:left;font-size:12px;color:var(--sub);line-height:1.9;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+  .src-block b{color:var(--txt)}
+  .formal{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+  .formal span{font-size:12px;padding:7px 12px;border:1px solid var(--line);border-radius:20px;color:var(--sub)}
+</style>
+</head>
+<body>
+<canvas id="starfield"></canvas>
+<div class="deck">
+
+  <!-- 1 封面 -->
+  <section id="s1">
+    <div class="pageno"><b>01</b> / 10</div>
+    <div class="kicker rv on">数据新闻 · 睡眠观察</div>
+    <h1 class="rv on d1">昨晚的<br>真实睡眠状态，<br>是什么？</h1>
+    <p class="lead rv on d2" style="margin-top:22px">当城市入睡，你是沉入安稳的夜色，<br>还是又一次睁着眼睛，等到了天亮。</p>
+    <div class="scroll-hint">向上滑动 ↓</div>
+  </section>
+
+  <!-- 2 选题背景 -->
+  <section id="s2">
+    <div class="pageno"><b>02</b> / 10</div>
+    <div class="kicker rv">选题背景 · 新闻由头</div>
+    <h2 class="rv d1">当代人的夜晚，<br>正在被<span class="accent">手机和焦虑</span>悄悄拉长</h2>
+    <div class="card rv d2" style="margin-top:18px">
+      <p class="lead">刷不完的短视频、停不下来的工作群、躺在床上仍在打转的思绪……"再睡五分钟"成了清晨最熟悉的一句话。</p>
+      <p class="lead" style="margin-top:12px">晚睡、入睡难、夜间易醒、睡不够——睡眠问题早已不是个别人的困扰，而是一代人的集体生活现状。</p>
+    </div>
+    <p class="src rv d3">本作品试图让读者看到：在"熬夜"这件事背后，是怎样一组被长期忽视的群体数据。</p>
+  </section>
+
+  <!-- 3 核心发现 大数字 -->
+  <section id="s3">
+    <div class="pageno"><b>03</b> / 10</div>
+    <div class="kicker rv">核心发现</div>
+    <div class="rv d1" style="margin:10px 0">
+      <div class="big-num"><span id="num3">0</span><small> 亿+</small></div>
+    </div>
+    <h2 class="rv d2">中国人存在睡眠障碍</h2>
+    <p class="lead rv d3" style="margin-top:14px">数据显示，有超 3 亿中国人存在睡眠障碍。<br><span class="accent">你，并不是一个人在失眠。</span></p>
+    <div class="grid2 rv d3" style="margin-top:26px">
+      <div class="sym"><div class="ico">🌙</div><h3>59%</h3><p>受访者存在失眠症状</p></div>
+      <div class="sym"><div class="ico">🕯️</div><h3>19%</h3><p>完全没有睡眠障碍</p></div>
+    </div>
+    <p class="src">数据来源：中国睡眠研究会《中国居民睡眠健康白皮书》公开调查数据</p>
+  </section>
+
+  <!-- 4 趋势折线 -->
+  <section id="s4">
+    <div class="pageno"><b>04</b> / 10</div>
+    <div class="kicker rv"></div>
+    <h2 class="rv d1">近十年，国人平均入睡时间<br>正在不断<span class="accent">推迟</span></h2>
+    <div class="chart-box rv d2"><canvas id="lineChart"></canvas></div>
+    <div class="legend rv d3">
+      <span><i style="background:#7db8ff"></i>平均入睡时刻（夜间）</span>
+    </div>
+    <p class="src">横轴为年份，纵轴为入睡时刻；近十年平均入睡时间推迟约 1 小时。</p>
+  </section>
+
+  <!-- 5 群体差异 柱状 -->
+  <section id="s5">
+    <div class="pageno"><b>05</b> / 10</div>
+    <div class="kicker rv"></div>
+    <h2 class="rv d1">不同世代，<br>平均每日睡眠时长对比</h2>
+    <div class="chart-box rv d2"><canvas id="barChart"></canvas></div>
+    <div class="legend rv d3">
+      <span><i style="background:#8fe0e8"></i>平均睡眠时长（小时 / 天）</span>
+    </div>
+    <p class="src">数据来源：中国睡眠研究会白皮书代际分组统计；年轻人入睡更晚、睡眠时长更短的趋势最为明显。</p>
+  </section>
+
+  <!-- 6 现状切片 条形 -->
+  <section id="s6">
+    <div class="pageno"><b>06</b> / 10</div>
+    <div class="kicker rv"></div>
+    <h2 class="rv d1">今晚，大家几点才放下手机？</h2>
+    <div class="rv d2" style="margin-top:18px">
+      <div class="bar-row"><div class="top"><span>23:00 前入睡</span><span>29%</span></div><div class="bar-track"><div class="bar-fill" data-w="29"></div></div></div>
+      <div class="bar-row"><div class="top"><span>23:00 – 24:00 入睡</span><span>24%</span></div><div class="bar-track"><div class="bar-fill" data-w="24"></div></div></div>
+      <div class="bar-row"><div class="top"><span>0:00 – 1:00 入睡</span><span>34%</span></div><div class="bar-track"><div class="bar-fill" data-w="34"></div></div></div>
+      <div class="bar-row"><div class="top"><span>凌晨 1:00 以后入睡</span><span>13%</span></div><div class="bar-track"><div class="bar-fill" data-w="13"></div></div></div>
+    </div>
+    <p class="lead rv d3" style="margin-top:18px">零点之后入睡的人，已经超过半数；<br>约四分之一的人，夜间睡眠不足 6 小时。</p>
+    <p class="src">数据来源：《2024 中国居民睡眠健康白皮书》入睡时间分布调查</p>
+  </section>
+
+  <!-- 7 自测交互 -->
+  <section id="s7">
+    <div class="pageno"><b>07</b> / 10</div>
+    <div class="kicker rv">互动自测</div>
+    <h2 class="rv d1">测一测：<br>你昨晚睡得怎么样？</h2>
+    <div id="quiz" class="rv d2"></div>
+    <div id="quizResult" class="rv d3"></div>
+  </section>
+
+  <!-- 8 熬夜的代价 -->
+  <section id="s8">
+    <div class="pageno"><b>08</b> / 10</div>
+    <div class="kicker rv">健康代价</div>
+    <h2 class="rv d1">长期睡不好，<br>身体会悄悄发出这些信号</h2>
+    <div class="grid2 rv d2" style="margin-top:18px">
+      <div class="sym"><div class="ico">🌀</div><h3>白天疲惫</h3><p>头昏、嗜睡、注意力难以集中，反应变慢。</p></div>
+      <div class="sym"><div class="ico">😶‍🌫️</div><h3>情绪波动</h3><p>更容易烦躁、焦虑，情绪低落且难以平复。</p></div>
+      <div class="sym"><div class="ico">🍩</div><h3>食欲紊乱</h3><p>对高糖高油食物渴望增强，代谢负担加重。</p></div>
+      <div class="sym"><div class="ico">🛡️</div><h3>免疫力下降</h3><p>睡眠不足会影响身体修复，更容易感冒生病。</p></div>
+    </div>
+    <p class="src rv d3">提示：以上为长期睡眠不足的常见表现；若长期严重失眠，建议前往正规医院睡眠门诊咨询。</p>
+  </section>
+
+  <!-- 9 改善建议 -->
+  <section id="s9">
+    <div class="pageno"><b>09</b> / 10</div>
+    <div class="kicker rv">科学改善</div>
+    <h2 class="rv d1">五个小习惯，<br>把夜晚还给睡眠</h2>
+    <div class="rv d2" style="margin-top:10px">
+      <div class="tip"><div class="n">1</div><div><h3>固定作息</h3><p>每天尽量在同一时间上床、同一时间起床，周末也不要相差太多。</p></div></div>
+      <div class="tip"><div class="n">2</div><div><h3>睡前一小时放下手机</h3><p>调暗灯光，避开短视频和工作消息，让大脑提前进入放松状态。</p></div></div>
+      <div class="tip"><div class="n">3</div><div><h3>打造安静黑暗的卧室</h3><p>保持凉爽、安静、光线偏暗，床只用来睡觉，不在床上办公刷剧。</p></div></div>
+      <div class="tip"><div class="n">4</div><div><h3>下午后避开刺激物</h3><p>咖啡、浓茶、奶茶和剧烈运动尽量安排在白天，傍晚后减少摄入。</p></div></div>
+      <div class="tip"><div class="n">5</div><div><h3>睡不着别硬躺</h3><p>躺下 20 分钟仍无困意，就起身做些安静的事，有困意再回到床上。</p></div></div>
+    </div>
+  </section>
+
+  <!-- 10 结尾 + 创作说明 -->
+  <section id="s10">
+    <div class="pageno"><b>10</b> / 10</div>
+    <div class="end">
+      <div class="moon rv">🌙</div>
+      <h1 class="rv d1">晚安，<br>愿你今夜<span class="accent">好眠</span></h1>
+      <p class="lead rv d2" style="margin-top:16px">数据会提醒我们困意，<br>
+      </p>
+  </section>
+
+</div>
+
+<script>
+/* ---------- 星空背景 ---------- */
+const cv=document.getElementById('starfield'),ctx=cv.getContext('2d');
+let stars=[];
+function sizeSky(){cv.width=innerWidth;cv.height=innerHeight;
+  stars=Array.from({length:Math.min(120,innerWidth/6)},()=>({
+    x:Math.random()*cv.width,y:Math.random()*cv.height,
+    r:Math.random()*1.4+.3,a:Math.random()*.6+.2,ph:Math.random()*Math.PI*2,sp:Math.random()*.02+.005
+  }));
+}
+sizeSky();addEventListener('resize',sizeSky);
+(function tw(t){ctx.clearRect(0,0,cv.width,cv.height);
+  stars.forEach(s=>{const al=s.a*(0.6+0.4*Math.sin(t*s.sp+s.ph));
+    ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,7);ctx.fillStyle=`rgba(200,220,255,${al})`;ctx.fill();});
+  requestAnimationFrame(tw);})(0);
+
+/* ---------- 入场动画 ---------- */
+const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('on');io.unobserve(e.target);}})},{threshold:.25});
+document.querySelectorAll('.rv').forEach(el=>io.observe(el));
+
+/* ---------- 大数字滚动 ---------- */
+const num3=document.getElementById('num3');
+const nio=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){
+  let cur=0;const target=3;const step=target/40;
+  const t=setInterval(()=>{cur+=step;if(cur>=target){cur=target;clearInterval(t);}num3.textContent=cur.toFixed(1);},30);
+  nio.unobserve(e.target);}});},{threshold:.5});
+nio.observe(num3);
+
+/* ---------- 条形生长 ---------- */
+const bio=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){
+  e.target.querySelectorAll('.bar-fill').forEach((b,i)=>setTimeout(()=>b.style.width=b.dataset.w+'%',i*150));
+  bio.unobserve(e.target);}});},{threshold:.3});
+bio.observe(document.getElementById('s6'));
+
+/* ---------- 图表 ---------- */
+const axisStyle={color:'#93a8d4',font:{size:11}};
+Chart.defaults.color='#a9bde6';Chart.defaults.font.family="'Noto Sans SC',sans-serif";
+
+let lineChart=null,barChart=null,chartsStarted={line:false,bar:false};
+
+function makeLine(){
+  const c=document.getElementById('lineChart');
+  lineChart=new Chart(c,{
+    type:'line',
+    data:{labels:['2015','2017','2019','2021','2023','2025'],
+      datasets:[{label:'入睡时刻',data:[22.8,23.05,23.3,23.6,23.9,0.30],
+        borderColor:'#7db8ff',backgroundColor:'rgba(125,184,255,.12)',fill:true,tension:.4,
+        pointBackgroundColor:'#cfe6ff',pointRadius:4,borderWidth:2.5}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      animation:{duration:1800,easing:'easeOutCubic'},
+      animations:{x:{from:0}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:v=>{const h=Math.floor(v.raw),m=Math.round((v.raw%1)*60);return`入睡 ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;}}}},
+      scales:{
+        y:{min:22,max:25,ticks:{...axisStyle,callback:v=>{if(v>=24)v-=24;return String(v).padStart(2,'0')+':00';}},grid:{color:'rgba(150,180,230,.12)'}},
+        x:{ticks:axisStyle,grid:{display:false}}}}
+  });
+}
+function makeBar(){
+  const c=document.getElementById('barChart');
+  barChart=new Chart(c,{
+    type:'bar',
+    data:{labels:['70前','80后','90后','00后'],
+      datasets:[{label:'睡眠时长',data:[7.3,7.1,6.7,6.6],
+        backgroundColor:['rgba(143,224,232,.45)','rgba(125,184,255,.55)','rgba(125,184,255,.7)','rgba(179,166,255,.75)'],
+        borderRadius:8,barPercentage:.55}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      animation:{duration:1400,easing:'easeOutCubic'},
+      animations:{y:{from:0}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:v=>v.raw+' 小时'}}},
+      scales:{y:{min:0,max:9,ticks:{...axisStyle,callback:v=>v+'h'},grid:{color:'rgba(150,180,230,.12)'}},
+        x:{ticks:axisStyle,grid:{display:false}}}}
+  });
+}
+
+const cio=new IntersectionObserver(es=>{es.forEach(e=>{
+  if(e.isIntersecting){
+    if(e.target.id==='s4'&&!chartsStarted.line){chartsStarted.line=true;makeLine();}
+    if(e.target.id==='s5'&&!chartsStarted.bar){chartsStarted.bar=true;makeBar();}
+  }})},{threshold:.35});
+cio.observe(document.getElementById('s4'));
+cio.observe(document.getElementById('s5'));
+
+/* ---------- 自测 ---------- */
+const quiz=[
+  {q:'昨晚几点躺下的？',o:[['23:00 前',3],['23:00 – 24:00',2],['0:00 – 1:00',1],['凌晨 1:00 以后',0]]},
+  {q:'躺下后多久睡着？',o:[['15 分钟以内',3],['15 – 30 分钟',2],['半小时以上',1],['反复翻身很久',0]]},
+  {q:'夜里醒来过几次？',o:[['没有醒来',3],['1 次',2],['2 次及以上',1],['醒后很难再入睡',0]]},
+  {q:'今早起床的状态？',o:[['精力充沛',3],['还算可以',2],['明显疲惫',1],['头昏嗜睡',0]]}
+];
+let ans=new Array(quiz.length).fill(null);
+const quizEl=document.getElementById('quiz'),resEl=document.getElementById('quizResult');
+
+function renderQuiz(){
+  quizEl.innerHTML='';
+  quiz.forEach((item,qi)=>{
+    const wrap=document.createElement('div');
+    wrap.innerHTML=`<div class="quiz-q">${qi+1}. ${item.q}</div>`;
+    item.o.forEach(([text,sc],oi)=>{
+      const b=document.createElement('button');
+      b.className='quiz-op'+(ans[qi]===sc?' sel':'');
+      b.innerHTML=`<span class="tag">${'ABCD'[oi]}</span>${text}`;
+      b.onclick=()=>{ans[qi]=sc;renderQuiz();};
+      wrap.appendChild(b);
+    });
+    quizEl.appendChild(wrap);
+  });
+  if(ans.every(v=>v!==null)){showResult();}else{resEl.innerHTML='';}
+}
+function showResult(){
+  const sum=ans.reduce((a,b)=>a+b,0);
+  let level,msg,color;
+  if(sum>=8){level='睡眠状态良好';msg='继续保持规律作息，让安稳的夜晚成为常态。';color='#8fe0e8';}
+  else if(sum>=5){level='睡眠一般，略有疲惫';msg='睡眠时长或质量有下滑，试着提前放下手机、固定上床时间。';color='#7db8ff';}
+  else{level='睡眠欠佳，需要重视';msg='入睡难、易醒或睡不够已影响状态，建议调整作息，长期不缓解可就医咨询。';color='#ffd9a8';}
+  resEl.innerHTML=`<div class="card"><div style="font-size:13px;color:var(--sub);margin-bottom:6px">你的昨晚睡眠得分</div>
+    <div style="font-size:30px;font-weight:900;color:${color}">${level}</div>
+    <p class="lead" style="margin-top:10px">${msg}</p></div>`;
+}
+renderQuiz();
+</script>
+</body>
+</html>
+<!-- （注：内容由AI生成） -->
